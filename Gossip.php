@@ -8,11 +8,21 @@
 
 class Gossip
 {
-    public function __construct()
+    public function __construct($ip = null, $port = null, $peer = null)
     {
+        $ip     = $ip   ?? getenv('ip')   ?? gethostbyname(gethostname());
+        $port   = $port ?? getenv('port');
+        $peer   = $peer ?? getenv('peer') ?? null;
+        
         $this->connect([
-            'server' => 'http://' . gethostbyname(gethostname()) . ':' . getenv('port')
+            'server' => "http://{$ip}:{$port}"
         ]);
+
+        if ($peer) {
+            $this->connect([
+                'server' => "http://{$peer}"
+            ]);
+        }
     }
 
     public function getPeers()
