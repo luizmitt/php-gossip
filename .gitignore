@@ -1,1 +1,5 @@
 peers.list
+download/*
+upload/*
+!download/.keep
+!upload/.keep

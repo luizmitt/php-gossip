@@ -8,12 +8,12 @@
 
 class Gossip
 {
-    public function __construct($ip = null, $port = null, $peer = null)
+    public function __construct($file = null)
     {
-        $ip     = $ip   ?? getenv('ip')   ?? gethostbyname(gethostname());
-        $port   = $port ?? getenv('port');
-        $peer   = $peer ?? getenv('peer') ?? null;
-        
+        $ip     = (getenv('ip') != null) ? getenv('ip') : gethostbyname(gethostname());
+        $port   = getenv('port');
+        $peer   = getenv('peer') ?? null;
+
         $this->connect([
             'server' => "http://{$ip}:{$port}"
         ]);
@@ -23,6 +23,46 @@ class Gossip
                 'server' => "http://{$peer}"
             ]);
         }
+    }
+
+    public function upload() {
+        $fileUploadPath = __DIR__ . "/upload/";
+        // $fileDownloadPath = __DIR__ . "/download/";
+
+        foreach (glob($fileUploadPath . '/*') as $fileUpload) {
+            if (file_exists($fileUpload)) {
+
+                // foreach (glob($fileDownloadPath . '/*') as $fileDownload) {
+                //     if (file_exists($fileDownload)) {
+                //         unset($fileUpload);
+                //         continue;
+                //     }
+                // }
+
+                if (file_exists($fileUpload)) {
+                    $binary = base64_encode(file_get_contents($fileUpload));
+                    $file   = md5_file($fileUpload);
+
+                    if ($peers = $this->getPeers()) {
+                        foreach ($peers as $index=>$peer) {
+                            if ($this->request("{$peer['server']}/upload.php", ['name' => $file, 'file' => $binary], 'POST')) {
+                                echo "* {$peer['server']} file uploaded!\r\n";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public function requestUpload()
+    {
+        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'POST') {
+            $data = json_decode(file_get_contents("php://input"), true);
+            file_put_contents(__DIR__ . "/download/{$data['name']}", base64_decode($data['file']));
+        }
+
+        echo 1;
     }
 
     public function getPeers()
@@ -41,8 +81,10 @@ class Gossip
                 }
             }
 
+            echo "* {$data['server']} connected!\r\n";
             $peers[] = $data;
         } else {
+            echo "* peers updated!\r\n";
             $peers = $data;
         }
 
@@ -51,7 +93,7 @@ class Gossip
 
     public function disconnect($peer)
     {
-        echo "{$peer['server']} desconectou do nó!\r\n";
+        echo "* {$peer['server']} disconnected!\r\n";
 
         if ($peers = $this->getPeers()) {
             foreach ($peers as $index=>$p) {
@@ -65,20 +107,41 @@ class Gossip
 
     public function broadcast()
     {
-        echo time() . " broadcast network\r\n";
+        echo "* checking connections....\r\n";
+        $this->makePersistente();
 
+        echo "* broadcast network\r\n";
         if ($peers = $this->getPeers()) {
             foreach ($peers as $index=>$peer) {
-                echo "{$peer['server']} updating...\r";
-                $broadcast = @file_get_contents("{$peer['server']}/broadcast.php", null, stream_context_create([
-                    'http' => [
-                        'method'  => 'POST',
-                        'header'  => "Content-Type: application/json\r\n",
-                        'content' => json_encode($peers)
-                    ]
-                ]));
+                $broadcast = $this->request("{$peer['server']}/broadcast.php", $peers);
 
                 if (!$broadcast) {
+                    $this->disconnect($peer);
+                }
+            }
+        }
+
+        echo "* checking files...\r\n";
+        $this->upload("arquivo.txt");
+    }
+
+    public function request($url, $file, $method = 'POST')
+    {
+        return @file_get_contents($url, null, stream_context_create([
+            'http' => [
+                'timeout' => '10',
+                'method'  => strtoupper($method),
+                'header'  => "Content-Type: application/json\r\n",
+                'content' => json_encode($file)
+            ]
+        ]));
+    }
+
+    public function makePersistente()
+    {
+        if ($peers = $this->getPeers()) {
+            foreach ($peers as $index=>$peer) {
+                if (!$this->request($peer['server'] . '/peers.list', [], 'GET')) {
                     $this->disconnect($peer);
                 }
             }
@@ -93,16 +156,16 @@ class Gossip
             if ($data) {
                 $this->connect($data, true);
             }
-
-            echo 1;
         }
+
+        echo 1;
     }
 
     public function loop()
     {
         while(true) {
             $this->broadcast();
-            usleep(2000000);
+            usleep(4000000);
         }
     }
 }
