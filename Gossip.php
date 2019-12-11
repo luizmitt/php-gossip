@@ -26,28 +26,18 @@ class Gossip
     }
 
     public function upload() {
-        $fileUploadPath = __DIR__ . "/upload/";
-        // $fileDownloadPath = __DIR__ . "/download/";
+        $path = __DIR__ . "/shared/";
 
-        foreach (glob($fileUploadPath . '/*') as $fileUpload) {
-            if (file_exists($fileUpload)) {
+        foreach (glob($path . '/*') as $file) {
+            if (file_exists($file)) {
+                $binary     = base64_encode(file_get_contents($file));
+                $parts      = explode("/", $file);
+                $filename   = end($parts);
 
-                // foreach (glob($fileDownloadPath . '/*') as $fileDownload) {
-                //     if (file_exists($fileDownload)) {
-                //         unset($fileUpload);
-                //         continue;
-                //     }
-                // }
-
-                if (file_exists($fileUpload)) {
-                    $binary = base64_encode(file_get_contents($fileUpload));
-                    $file   = md5_file($fileUpload);
-
-                    if ($peers = $this->getPeers()) {
-                        foreach ($peers as $index=>$peer) {
-                            if ($this->request("{$peer['server']}/upload.php", ['name' => $file, 'file' => $binary], 'POST')) {
-                                echo "* {$peer['server']} file uploaded!\r\n";
-                            }
+                if ($peers = $this->getPeers()) {
+                    foreach ($peers as $index=>$peer) {
+                        if ($this->request("{$peer['server']}/upload.php", ['name' => $filename, 'file' => $binary], 'POST')) {
+                            echo "* {$peer['server']} file uploaded!\r\n";
                         }
                     }
                 }
@@ -59,7 +49,7 @@ class Gossip
     {
         if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'POST') {
             $data = json_decode(file_get_contents("php://input"), true);
-            file_put_contents(__DIR__ . "/download/{$data['name']}", base64_decode($data['file']));
+            file_put_contents(__DIR__ . "/shared/{$data['name']}", base64_decode($data['file']));
         }
 
         echo 1;
