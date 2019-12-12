@@ -8,7 +8,7 @@ class Gossip {
     public function __construct()
     {
         $protocol = (getenv('protocol') != null) ? getenv('protocol') : 'http';
-        $ip       = (getenv('ip') != null) ? getenv('ip') : 'localhost';
+        $ip       = (getenv('ip') != null) ? getenv('ip') : gethostbyname(gethostname());
         $port     = (getenv('port') != null) ? getenv('port') : null;
         $peer     = (getenv('peer') != null) ? getenv('peer') : null;
 
